@@ -1,9 +1,11 @@
 from __future__ import print_function
 from apiclient.discovery import build
+from bs4 import BeautifulSoup
 from httplib2 import Http
 from oauth2client import file as oauth_file, client, tools
 import base64
-import email
+import requests
+import urllib3
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = 'https://www.googleapis.com/auth/gmail.modify'
@@ -31,15 +33,20 @@ def main():
         print('No messages found.')
     else:
         found = False
+        tweetURL = None
         for message in messages:
             content = service.users().messages().get(userId='me', id=message['id']).execute()
             payload = content['payload']
             headers = payload['headers']
             parts = payload['parts']
             for part in parts:
-                body_str = base64.urlsafe_b64decode(part['body']['data'])
-                body = email.message_from_string(body_str)
-                print(body)
+                body = base64.urlsafe_b64decode(part['body']['data']).decode("utf-8")
+                soup = BeautifulSoup(body, 'html.parser')
+                links = soup.find_all('a')
+                for index, link in enumerate(links):
+                    if index == 3:
+                        # Fourth link in email is the 'tweet' link
+                        tweetURL = link.get('href')
             for header in headers:
                 if header['name'] == 'From':
                     sender = header['value']
@@ -48,10 +55,18 @@ def main():
             if GOLDS_FROM in sender and GOLDS_SUBJECT in subject:
                 print(sender)
                 print(subject)
+                print(tweetURL)
+                login(tweetURL)
                 found = True
                 #service.users().messages().modify(userId='me',id=message['id'],body={'removeLabelIds':['UNREAD']}).execute()
         print(found)
 
+def login(url):
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    login_html = requests.get(url, verify=False)
+    soup = BeautifulSoup(login_html.content, 'html.parser')
+    csrfToken = soup.find('input', {"name":"csrfmiddlewaretoken"}).get('value')
+    print(csrfToken)
 
 if __name__ == '__main__':
     main()
