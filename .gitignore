@@ -1,3 +1,7 @@
 credentials.json
 login.json
 token.json
+
+*.swp
+
+session.txt

@@ -3,8 +3,11 @@ from apiclient.discovery import build
 from bs4 import BeautifulSoup
 from httplib2 import Http
 from oauth2client import file as oauth_file, client, tools
+
 import base64
+import json
 import requests
+import urllib
 import urllib3
 
 # If modifying these scopes, delete the file token.json.
@@ -17,6 +20,14 @@ def main():
     Get unread messages, look for unread emails from Gold's less than 24h old that say "You earned X points".
     If found, mark the message as read and tweet at Gold's for bonus points.
     """
+
+    found = False
+    sessionid = None
+    sessionid_expires = None
+    token = None
+    token_expires = None
+    tweetURL = None
+
     # Authenticate to GMail using OAuth; store the token for reuse
     store = oauth_file.Storage('token.json')
     creds = store.get()
@@ -32,8 +43,6 @@ def main():
     if not messages:
         print('No messages found.')
     else:
-        found = False
-        tweetURL = None
         for message in messages:
             content = service.users().messages().get(userId='me', id=message['id']).execute()
             payload = content['payload']
@@ -53,20 +62,53 @@ def main():
                 if header['name'] == 'Subject':
                     subject = header['value']
             if GOLDS_FROM in sender and GOLDS_SUBJECT in subject:
-                print(sender)
-                print(subject)
-                print(tweetURL)
-                login(tweetURL)
                 found = True
+                print("Sender: " + sender)
+                print("Subject: " + subject)
+                print("Referral URL: " + tweetURL)
+                if token == None or sessionid == None: # TODO: check if past expiration date
+                    token, token_expires, sessionid, sessionid_expires = login(tweetURL)
+                else:
+                    tweet(tweetURL, sessionid, token)
                 #service.users().messages().modify(userId='me',id=message['id'],body={'removeLabelIds':['UNREAD']}).execute()
-        print(found)
 
 def login(url):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     login_html = requests.get(url, verify=False)
     soup = BeautifulSoup(login_html.content, 'html.parser')
     csrfToken = soup.find('input', {"name":"csrfmiddlewaretoken"}).get('value')
-    print(csrfToken)
+    print("CSRF Token: " + csrfToken)
+
+    with open('login.json') as f:
+        creds = json.load(f)
+    headers = {'Content-Type': 'text/html'}
+    data = {
+            'csrfmiddlewaretoken': csrfToken,
+            'form_type': 'signin',
+            'username': creds['username'],
+            'password': creds['password'],
+            'redirect_to': 'https://goldsgymsocal.perkville.com/earning/#checkin'
+            }
+    print("URL Params: " + urllib.parse.urlencode(data))
+    r = requests.post(url, json=data, headers=headers)
+    if r.ok:
+        response = r.headers['Set-Cookie'].split(';')
+        print("Response Headers: ")
+        print(response)
+        token = response[0].split('=')[1]
+        token_expires = response[1].split('=')[1]
+        sessionid = response[4].split('=')[1]
+        sessionid_expires = response[6].split('=')[1]
+        print("Token: " + token)
+        print("Token Expires: " + token_expires)
+        print("SessionID: " + sessionid)
+        print("SessionID Expires: " + sessionid_expires)
+    else:
+        r.raise_for_status()
+    return token, token_expires, sessionid, sessionid_expires
+
+#def tweet(url, sessionid, token):
+    # TODO: Get the page contents using the info grabbed above
 
 if __name__ == '__main__':
     main()
