@@ -9,7 +9,6 @@ GOLDS_FROM = 'rewards@perkville.com'
 GOLDS_SUBJECT = 'You earned'
 
 def main():
-    print(TODAY)
     """
     Get unread messages, look for unread emails from Gold's less than 24h old that say "You earned X points".
     If found, mark the message as read and tweet at Gold's for bonus points.
