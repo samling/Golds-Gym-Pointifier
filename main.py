@@ -11,9 +11,10 @@ import urllib
 import urllib3
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = 'https://www.googleapis.com/auth/gmail.modify'
+CHECKIN_URL = 'https://goldsgymsocal.perkville.com/earning/#checkin'
 GOLDS_FROM = 'rewards@perkville.com'
 GOLDS_SUBJECT = 'You earned'
+SCOPES = 'https://www.googleapis.com/auth/gmail.modify'
 
 def main():
     """
@@ -27,6 +28,8 @@ def main():
     token = None
     token_expires = None
     tweetURL = None
+
+    session = requests.Session()
 
     # Authenticate to GMail using OAuth; store the token for reuse
     store = oauth_file.Storage('token.json')
@@ -67,12 +70,16 @@ def main():
                 print("Subject: " + subject)
                 print("Referral URL: " + tweetURL)
                 if token == None or sessionid == None: # TODO: check if past expiration date
-                    token, token_expires, sessionid, sessionid_expires = login(tweetURL)
-                else:
-                    tweet(tweetURL, sessionid, token)
+                    #token, token_expires, sessionid, sessionid_expires = login(tweetURL, session)
+                    login(tweetURL, session)
+                    print("Session: ")
+                    print(session.cookies.get_dict())
+                    tweet(CHECKIN_URL, session)
+                #else:
+                    #tweet(tweetURL, sessionid, token)
                 #service.users().messages().modify(userId='me',id=message['id'],body={'removeLabelIds':['UNREAD']}).execute()
 
-def login(url):
+def login(url, session):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     login_html = requests.get(url, verify=False)
     soup = BeautifulSoup(login_html.content, 'html.parser')
@@ -90,25 +97,26 @@ def login(url):
             'redirect_to': 'https://goldsgymsocal.perkville.com/earning/#checkin'
             }
     print("URL Params: " + urllib.parse.urlencode(data))
-    r = requests.post(url, json=data, headers=headers)
+    r = session.post(url, json=data, headers=headers)
     if r.ok:
         response = r.headers['Set-Cookie'].split(';')
         print("Response Headers: ")
         print(response)
-        token = response[0].split('=')[1]
-        token_expires = response[1].split('=')[1]
-        sessionid = response[4].split('=')[1]
-        sessionid_expires = response[6].split('=')[1]
-        print("Token: " + token)
-        print("Token Expires: " + token_expires)
-        print("SessionID: " + sessionid)
-        print("SessionID Expires: " + sessionid_expires)
+        #token = response[0].split('=')[1]
+        #token_expires = response[1].split('=')[1]
+        #sessionid = response[4].split('=')[1]
+        #sessionid_expires = response[6].split('=')[1]
+        #print("Token: " + token)
+        #print("Token Expires: " + token_expires)
+        #print("SessionID: " + sessionid)
+        #print("SessionID Expires: " + sessionid_expires)
     else:
         r.raise_for_status()
-    return token, token_expires, sessionid, sessionid_expires
+    #return token, token_expires, sessionid, sessionid_expires
 
-#def tweet(url, sessionid, token):
+def tweet(url, session):
     # TODO: Get the page contents using the info grabbed above
+    print(session.get(url).text)
 
 if __name__ == '__main__':
     main()
