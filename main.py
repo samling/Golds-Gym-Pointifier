@@ -2,6 +2,8 @@ from __future__ import print_function
 from apiclient.discovery import build
 from httplib2 import Http
 from oauth2client import file as oauth_file, client, tools
+import base64
+import email
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = 'https://www.googleapis.com/auth/gmail.modify'
@@ -33,8 +35,11 @@ def main():
             content = service.users().messages().get(userId='me', id=message['id']).execute()
             payload = content['payload']
             headers = payload['headers']
-            body = payload['body']
-            print(body)
+            parts = payload['parts']
+            for part in parts:
+                body_str = base64.urlsafe_b64decode(part['body']['data'])
+                body = email.message_from_string(body_str)
+                print(body)
             for header in headers:
                 if header['name'] == 'From':
                     sender = header['value']
