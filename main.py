@@ -22,7 +22,7 @@ def main():
     service = build('gmail', 'v1', http=creds.authorize(Http()))
 
     # Call the Gmail API
-    query = "newer_than:1d" # Only looking for emails within the last 24 hours
+    query = "newer_than:2d" # Only looking for emails within the last 24 hours
     results = service.users().messages().list(userId='me',labelIds=['INBOX', 'UNREAD'],q=query).execute()
     messages = results.get('messages', [])
     if not messages:
@@ -31,7 +31,10 @@ def main():
         found = False
         for message in messages:
             content = service.users().messages().get(userId='me', id=message['id']).execute()
-            headers = content['payload']['headers']
+            payload = content['payload']
+            headers = payload['headers']
+            body = payload['body']
+            print(body)
             for header in headers:
                 if header['name'] == 'From':
                     sender = header['value']
